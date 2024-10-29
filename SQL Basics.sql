@@ -524,17 +524,135 @@ FROM CTE_Example cte1
 LEFT JOIN CTE_Example2 cte2
 	ON cte1. employee_id = cte2. employee_id;
 
+WITH CTE_Example (gender, sum_salary, min_salary, max_salary, count_salary) AS 
+(
+SELECT gender, SUM(salary), MIN(salary), MAX(salary), COUNT(salary)
+FROM employee_demographics dem
+JOIN employee_salary sal
+	ON dem.employee_id = sal.employee_id
+GROUP BY gender
+)
+SELECT gender, ROUND(AVG(sum_salary/count_salary),2)AS round_sal
+FROM CTE_Example
+GROUP BY gender;
+
+-- temp tables in SQL
 
 
+CREATE TEMPORARY TABLE temp_table
+(first_name varchar(50),
+last_name varchar(50),
+favorite_movie varchar(100)
+);
+INSERT INTO temp_table
+VALUES ('Alex','Freberg','Lord of the Rings: The Twin Towers');
+
+INSERT INTO temp_table(first_name,last_name,favorite_movie)
+VALUES ('Kavinda','Rajapaksha','Harry Potter');
 
 
+SELECT *
+FROM temp_table;
+
+CREATE TEMPORARY TABLE salary_over_50k
+SELECT *
+FROM employee_salary
+WHERE salary > 50000;
+
+SELECT *
+FROM salary_over_50k;
 
 
+CREATE PROCEDURE large_salaries()
+SELECT *
+FROM employee_salary
+WHERE salary > 50000;
 
+CALL large_salaries();
 
+CREATE PROCEDURE large_salaries2()
+SELECT *
+FROM employee_salary
+WHERE salary >= 60000;
+SELECT *
+FROM employee_salary
+WHERE salary >= 50000;
 
+CALL large_salaries2();
 
+DELIMITER $$
+CREATE PROCEDURE large_salaries3()
+BEGIN
+	SELECT *
+	FROM employee_salary
+	WHERE salary >= 60000;
+	SELECT *
+	FROM employee_salary
+	WHERE salary >= 50000;
+END $$
+DELIMITER ;
 
+DROP procedure IF EXISTS `large_salaries3`;
+-- it automatically adds the dilimiter for us
+DELIMITER $$
+CREATE PROCEDURE large_salaries3(employee_id_param INT)
+BEGIN
+	SELECT *
+	FROM employee_salary
+	WHERE salary >= 60000
+    AND employee_id_param = employee_id;
+END $$
 
+DELIMITER ;
  
- 
+
+
+CALL large_salaries3(1);
+
+
+-- triggers and events
+
+DELIMITER $$
+CREATE TRIGGER employee_insert2
+    -- we can also do BEFORE, but for this lesson we have to do after
+	AFTER INSERT ON employee_salary
+    -- now this means this trigger gets activated for each row that is inserted. Some sql databses like MSSQL have batch triggers or table level triggers that
+    -- only trigger once, but MySQL doesn't have this functionality unfortunately
+    FOR EACH ROW
+    
+    -- now we can write our block of code that we want to run when this is triggered
+BEGIN
+-- we want to update our client invoices table
+-- and set the total paid = total_paid (if they had already made some payments) + NEW.amount_paid
+-- NEW says only from the new rows that were inserted. There is also OLD which is rows that were deleted or updated, but for us we want NEW
+    INSERT INTO employee_demographics (employee_id, first_name, last_name) VALUES (NEW.employee_id,NEW.first_name,NEW.last_name);
+END $$
+
+DELIMITER ; 
+
+INSERT INTO employee_salary (employee_id, first_name, last_name, occupation, salary, dept_id)
+VALUES(13, 'Jean-Ralphio', 'Saperstein', 'Entertainment 720 CEO', 1000000, NULL);
+
+
+-- events
+
+SELECT * 
+FROM parks_and_recreation.employee_demographics;
+
+SHOW EVENTS;
+
+-- we can drop or alter these events like this:
+DROP EVENT IF EXISTS delete_retirees;
+DELIMITER $$
+CREATE EVENT delete_retirees
+ON SCHEDULE EVERY 30 SECOND
+DO BEGIN
+	DELETE
+	FROM parks_and_recreation.employee_demographics
+    WHERE age >= 60;
+END $$
+
+
+-- if we run it again you can see Jerry is now fired -- or I mean retired
+SELECT * 
+FROM parks_and_recreation.employee_demographics;
